@@ -1,0 +1,9 @@
+// $Id: CHANGELOG.txt,v 1.2 2011/01/25 08:20:25 hswong3i Exp $
+
+PayDollar PayGate 6.x-1.0-rc1, 2011-01-25
+----------------------
+- initial RC release.
+- integrate AsiaPay PayDollar PayGate with Ubercart 2.x.
+- support "Client Post Though Brower" connection method.
+- most logic clone from official ZenCart module implmentation.
+- include basic simpletest test case for IPN callback and datafeed callback.
