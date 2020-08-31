@@ -1,6 +1,9 @@
 # PayDollar/SiamPay/PesoPay Payment plugin for UberCart
 Use PayDollar/SiamPay/PesoPays plugin for UberCart on Wordpress to offer ALL payments option.
 
+## Download
+Please download the latest plugin version. [Download](https://github.com/asiapay-lib/asiapay-UberCart/releases/latest)
+
 ## Integration
 The plugin integrates integrate UberCart on Wordpress with PayDollar/SaimPay/PesoPay payment gateway with All payment method.
 
