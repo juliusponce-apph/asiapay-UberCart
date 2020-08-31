@@ -10,24 +10,14 @@ This plugin supports UberCart version 2 and higher.
 ## Installation
 1. Follow the normal steps to install & activate this module.
    See http://www.ubercart.org/docs/user/10972/installing_contributed_modules
-2. Go to "Administer > Store administration > Configuration > Payment settings
-   > Payment methods".
+2. Go to "Administer > Store administration > Configuration > Payment settings > Payment methods".
 3. Enable the "PayDollar PayGate" under "Payment methods" section.
-4. In the fieldset "PayDollar PayGate settings", enter your PayDollar merchant
-   ID.
-  4.1. (Optional) You can also change the Currency code, Language for checkout
-       page, and the Order review submit button text.
-  4.2. Don't forget to switch as "Live" PayDollar server when your site is
-       ready for production.
-5. The default Datafeed URL is "http://your.domain.com/uc_paydollar/datafeed".
-   You should apply this URL from AsiaPay customer support service in order to
-   modify your merchant account setting.
+4. In the fieldset "PayDollar PayGate settings", enter your PayDollar merchant ID.
+  4.1. (Optional) You can also change the Currency code, Language for checkout page, and the Order review submit button text.
+  4.2. Don't forget to switch as "Live" PayDollar server when your site is ready for production.
+5. The default Datafeed URL is "http://your.domain.com/uc_paydollar/datafeed". You should apply this URL from AsiaPay customer support service in order to modify your merchant account setting.
 
-Once above setup correctly, end-user will able to checkout with PayDollar
-PayGate. They will be forward to PayDollar's Payment Connection Page in order
-to complete their payment with all registered payment method of merchant
-account. After finish the payment, the browser will be redirected back to the
-shopping cart and the payment status will be shown.
+Once above setup correctly, end-user will able to checkout with PayDollar PayGate. They will be forward to PayDollar's Payment Connection Page in order to complete their payment with all registered payment method of merchant account. After finish the payment, the browser will be redirected back to the shopping cart and the payment status will be shown.
 
 ## Setup the Datafeed URL on PayDollar/PesoPay/SiamPay
  1. Login to your PayDollar/PesoPay/SiamPay account.
