@@ -1,11 +1,11 @@
-# PayDollar/SiamPay/PesoPay Payment plugin for UberCart
-Use PayDollar/SiamPay/PesoPays plugin for UberCart to offer ALL payments option.
+# PayDollar/PesoPay/SiamPay Payment plugin for UberCart
+Use PayDollar/PesoPay/SiamPay plugin for UberCart to offer ALL payments option.
 
 ## Download
 Please download the latest plugin version. [Download](https://github.com/asiapay-lib/asiapay-UberCart/releases/latest)
 
 ## Integration
-The plugin integrates integrate UberCart with PayDollar/SaimPay/PesoPay payment gateway with All payment method.
+The plugin integrates integrate UberCart with PayDollar/PesoPay/SiamPay payment gateway with All payment method.
 
 ## Requirements
 This plugin supports UberCart version 2 and higher.
