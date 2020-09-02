@@ -119,10 +119,12 @@ function uc_payment_method_paydollar($op, &$arg1) {
         '#title' => t('PayDollar server'),
         '#description' => t('Sign up for and use a Sandbox account for testing.'),
         '#options' => array(
-          'https://test.paydollar.com/b2cDemo/eng/payment/payForm.jsp' => t('Sandbox'),
-          'https://www.paydollar.com/b2c2/eng/payment/payForm.jsp' => t('Live'),
+          'https://test.paydollar.com/b2cDemo/eng/payment/payForm.jsp' => t('Sandbox-Paydollar'),
+          'https://www.paydollar.com/b2c2/eng/payment/payForm.jsp' => t('Live-Paydollar'),
+          'https://test.pesopay.com/b2cDemo/eng/payment/payForm.jsp' => t('Sandbox-Pesopay'),
+          'https://www.pesopay.com/b2c2/eng/payment/payForm.jsp' => t('Live-Pesopay'),
         ),
-        '#default_value' => variable_get('uc_paydollar_handler', 'https://test.paydollar.com/b2cDemo/eng/payment/payForm.jsp'),
+        '#default_value' => variable_get('uc_paydollar_handler', 'https://test.pesopay.com/b2cDemo/eng/payment/payForm.jsp'),
       );
       $form['paydollar']['uc_paydollar_currency'] = array(
         '#type' => 'select',
@@ -139,6 +141,7 @@ function uc_payment_method_paydollar($op, &$arg1) {
           '978' => 'EUR',
           '826' => 'GBP',
           '124' => 'CAD',
+          '608' => 'PHP',
         ),
         '#default_value' => variable_get('uc_paydollar_currency', '344'),
       );
@@ -161,6 +164,44 @@ function uc_payment_method_paydollar($op, &$arg1) {
         '#description' => t('Provide PayDollar PayGate specific text for the submit button on the order review page.'),
         '#default_value' => variable_get('uc_2checkout_checkout_button', t('Submit Order')),
       );
+      $form['paydollar']['uc_paydollar_securehashsecret'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Secure Hash Secret'),
+        '#description' => t('The Secure Hash Secret used for the PayDollar service.'),
+        '#default_value' => variable_get('uc_paydollar_securehashsecret', ''),
+      );
+
+      $form['paydollar']['uc_paydollar_transactiontype'] = array(
+        '#type' => 'select',
+        '#title' => t('Transaction Type'),
+        '#description' => t('Please choose the transaction type.'),
+        '#options' => array(
+          '01' => t('Goods/ Service Purchase'),
+          '03' => t('Check Acceptance'),
+          '10' => t('Account Funding'),
+          '11' => t('Quasi-Cash Transaction'),
+          '28' => t('Prepaid Activation and Load'),
+        ),
+        '#default_value' => variable_get('uc_paydollar_transactiontype', '01'),
+      );
+
+      $form['paydollar']['uc_paydollar_challengepref'] = array(
+        '#type' => 'select',
+        '#title' => t('Challenge Preference'),
+        '#description' => t('Please choose the Challenge Preference. If "No challenge requested" options are selected, the chargeback liability shift to merchant.'),
+        '#options' => array(
+          '01' => t('No preference'),
+          '02' => t('No challenge requested *'),
+          '03' => t('Challenge requested (Merchant preference)'),
+          '04' => t('Challenge requested (Mandate)'),
+          '05' => t('No challenge requested (transactional risk analysis is already performed) *'),
+          '06' => t('No challenge requested (Data share only)*'),
+          '07' => t('No challenge requested (strong consumer authentication is already performed) *'),
+          '08' => t('No challenge requested (utilise whitelist exemption if no challenge required) *'),
+          '09' => t('Challenge requested (whitelist prompt requested if challenge required)'),
+        ),
+        '#default_value' => variable_get('uc_paydollar_challengepref', '04'),
+      );
 
       return $form;
   }
@@ -179,14 +220,95 @@ function uc_paydollar_form($form_state, $order) {
     'failUrl' => url('uc_paydollar/fail/'. $order->order_id, array('absolute' => TRUE)),
     'cancelUrl' => url('uc_paydollar/cancel/'. $order->order_id, array('absolute' => TRUE)),
     'payType' => 'N',
-    'actionUrl' => variable_get('uc_paydollar_handler', 'https://test.paydollar.com/b2cDemo/eng/payment/payForm.jsp'),
+    'actionUrl' => variable_get('uc_paydollar_handler', 'https://test.pesopay.com/b2cDemo/eng/payment/payForm.jsp'),
     'code' => 'paydollar',
     'orderId' => $order->order_id,
     'lang' => variable_get('uc_paydollar_language', 'E'),
     'remark' => uc_cart_get_id(),
   );
+$customer_bill_phonenum = preg_replace('/\D/', '', $order->delivery_phone);
+$phoneCountryCode = uc_paydollar_countryapi($order->billing_country);
 
-  $form['#action'] = variable_get('uc_paydollar_handler', 'https://test.paydollar.com/b2cDemo/eng/payment/payForm.jsp');
+if(count($phoneCountryCode)>0)
+  $phoneCountryCode = $phoneCountryCode->callingCodes[0];
+
+$bill_state = uc_get_zone_code($order->billing_zone);
+
+$ship_state = uc_get_zone_code($order->delivery_zone);
+
+$isSameAddr = uc_paydollar_sameAddress($order);
+$shipDetl = $isSameAddress ? '01' : '03';
+
+$user = user_load(array('uid' => (int)$order->uid));
+$user_created = date("Ymd", $user->created);
+$dteAdd_diff = uc_paydollar_getDateDiff($user_created);
+$dteAddAge = uc_paydollar_getAcctAgeInd($dteAdd_diff);
+
+$authMethod = (int)$order->uid > 0 ? "02" : "01";
+
+$user_acctAuthDate = gmdate("Ymd" , $user->login);
+// echo $user_created;
+  $threeDSData = array(
+    'threeDSTransType' => variable_get('uc_paydollar_transactiontype','01'),
+    'threeDSChallengePreference' => variable_get('uc_paydollar_challengepref','01'),
+    'threeDSCustomerEmail' => $order->primary_email,
+    'threeDSMobilePhoneNumber' => $customer_bill_phonenum,
+    'threeDSHomePhoneNumber' => $customer_bill_phonenum,
+    'threeDSWorkPhoneNumber' => $customer_bill_phonenum,
+    'threeDSMobilePhoneCountryCode' => $phoneCountryCode,
+    'threeDSHomePhoneCountryCode' => $phoneCountryCode,
+    'threeDSWorkPhoneCountryCode' => $phoneCountryCode,
+
+
+    //Billing address related
+      'threeDSBillingCountryCode'   => $order->billing_country,
+      'threeDSBillingState'     => $bill_state,
+      'threeDSBillingCity'      => $order->billing_city,
+      'threeDSBillingLine1'       => $order->billing_street1,
+      'threeDSBillingLine2'     => $order->billing_street2,
+      'threeDSBillingPostalCode'    => $order->billing_postal_code,
+
+
+      //Shipping / Delivery Related
+      'threeDSDeliveryTime'     => '',
+      'threeDSDeliveryEmail'      => $order->primary_email,
+      'threeDSShippingDetails'    => $shipDetl,
+      'threeDSShippingCountryCode'  => $order->delivery_country,
+      'threeDSShippingState'    => $ship_state,
+      'threeDSShippingCity'     => $order->delivery_city,
+      'threeDSShippingLine1'      => $order->delivery_street1,
+      'threeDSShippingLine2'      => $order->delivery_street2,
+      'threeDSShippingPostalCode'   => $order->delivery_postal_code,
+      'threeDSIsAddrMatch'      => $isSameAddr,
+
+
+      'threeDSAcctCreateDate' => $user_created,
+      'threeDSAcctAgeInd' => $dteAddAge,
+      'threeDSAcctAuthMethod' => $authMethod,
+      'threeDSAcctAuthTimestamp' => $user_acctAuthDate,
+
+  );
+  $data = array_merge($data,$threeDSData);
+  // echo "<pre>";
+  // print_r($user);
+  // print_r($order);
+  // print_r($data);exit;
+  $secureHashSecret = variable_get('uc_paydollar_securehashsecret','');
+  if ($secureHashSecret) {
+  $merchantId = variable_get('uc_paydollar_id', '1');
+  $orderRef = $order->order_id;
+  $currCode = variable_get('uc_paydollar_currency', '344');
+  $amount = $order->order_total;
+  $payType = 'N';
+  require_once ('SHAPaydollarSecure.php');
+  $paydollarSecure = new SHAPaydollarSecure ();
+  $secureHash = $paydollarSecure->generatePaymentSecureHash ( $merchantId, $orderRef, $currCode, $amount, $payType, $secureHashSecret );
+  $data ['secureHash'] = $secureHash;
+} else {
+  $data ['secureHash'] = '';
+}
+
+  $form['#action'] = variable_get('uc_paydollar_handler', 'https://test.pesopay.com/b2cDemo/eng/payment/payForm.jsp');
 
   foreach ($data as $name => $value) {
     if (!empty($value)) {
@@ -201,3 +323,100 @@ function uc_paydollar_form($form_state, $order) {
 
   return $form;
 }
+
+function uc_paydollar_countryapi($countryCode){
+    $country = uc_get_country_data(array('country_id' => $countryCode));
+    $countryCode = $country[0]['country_iso_code_3'];
+    $method = "GET";
+    $url = "https://restcountries.eu/rest/v2/alpha/$countryCode";
+    // $data = array('codes'=>$countryCode);
+    $data = false;
+
+    $curl = curl_init();
+
+    switch ($method)
+    {
+        case "POST":
+            curl_setopt($curl, CURLOPT_POST, 1);
+
+            if ($data)
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+            break;
+        case "PUT":
+            curl_setopt($curl, CURLOPT_PUT, 1);
+            break;
+        default:
+            if ($data)
+                $url = sprintf("%s?%s", $url, http_build_query($data));
+    }
+
+    // Optional Authentication:
+    curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_setopt($curl, CURLOPT_USERPWD, "username:password");
+
+    curl_setopt($curl, CURLOPT_URL, $url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+    $result = curl_exec($curl);
+
+    curl_close($curl);
+
+    return json_decode($result);
+
+}
+
+function uc_paydollar_sameAddress($o){
+
+
+    $cnt = 0;
+
+    if($o->billing_country == $o->delivery_country)$cnt++;
+    if($o->billing_street1 == $o->delivery_street1)$cnt++;
+    if($o->billing_street2 == $o->delivery_street2)$cnt++;
+    if($o->delivery_city == $o->billing_city)$cnt++;
+    if($o->billing_postal_code == $o->delivery_postal_code)$cnt++;
+    if($o->delivery_zone == $o->billing_zone)$cnt++;
+
+
+    if($cnt==6)return "T";
+    else return "F";
+
+  }
+
+  function uc_paydollar_getDateDiff($d){
+          $datenow = date('Ymd');
+        $dt1 = new \DateTime($datenow);
+        $dt2 = new \DateTime($d);
+        $interval = $dt1->diff($dt2)->format('%a');
+        return $interval;
+      }
+
+  function uc_paydollar_getAcctAgeInd($d, $isUpDate = FALSE){
+        switch ($d) {
+          case 0:
+            # code...
+            $ret = "02";
+            if($isUpDate)$ret = "01";
+            break;
+          case $d<30:
+            # code...
+            $ret = "03";
+            if($isUpDate)$ret = "02";
+            break;
+          case $d>30 && $d<60:
+            # code...
+            $ret = "04";
+            if($isUpDate)$ret = "03";
+            break;
+          case $d>60:
+            $ret = "05" ;
+            if($isUpDate)$ret = "04";
+          break;  
+          default:
+            # code...
+            break;
+        }
+        return $ret;
+
+      }
+
